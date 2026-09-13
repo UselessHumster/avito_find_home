@@ -1,0 +1,108 @@
+city:
+  name: Ессентуки
+  slug: essentuki
+  searches:
+    - name: apartments
+      url: https://www.avito.ru/essentuki/kvartiry/sdam/na_dlitelnyy_srok-ASgBAgICAkSSA8gQ8AeQUg?s=104
+    - name: houses_cottages
+      url: https://www.avito.ru/essentuki/doma_dachi_kottedzhi/sdam/na_dlitelnyy_srok-ASgBAgICAkSUA9IQoAjIVQ?s=104
+
+hard_filters:
+  minimum_rooms: 2
+  exclude_short_term: true
+
+rating:
+  minimum_area: 54
+  maximum_real_price: 40000
+  points:
+    area: 1
+    price: 1
+    good_street: 2
+    neutral_street: 1
+    bad_street: -1
+  good_streets:
+    - Гоголя
+    - 9 января
+    - Оборонная
+    - Крупской
+    - Кольцевая
+    - Большая Бургустанская
+    - Большая Боргустанская
+    - Куйбышева
+    - Подкумская
+    - Анджиевского
+    - Баталинская
+    - Ленина
+    - Менделеева
+    - Семашко
+    - Малая Садовая
+    - Курсовая
+    - Воронцовская
+  bad_streets:
+    - Первомайская
+    - Орджоникидзе
+    - Володарского
+    - Гаевского
+    - Гагарина
+    - Кисловодская
+    - Луночарского
+    - Луначарского
+    - Чапаева
+    - Октябрьская
+    - Железнодорожная
+    - Вокзальная
+    - Буачидзе
+    - Ермолова
+    - Комарова
+    - Новопятигорская
+    - Шевченко
+    - Пушкина
+    - Элеваторная
+    - Суворовское шоссе
+
+important:
+  children: true
+  commission: true
+  utilities: true
+  price_colors:
+    green_max: 30000
+    yellow_max: 40000
+    red_max: 50000
+
+browser:
+  debug_port: 9222
+  profile_dir: runtime/avito-chrome-profile
+  chrome_path: null
+  driver_path: null
+
+collection:
+  interval_minutes_min: 30
+  interval_minutes_max: 60
+  page_delay_seconds_min: 12
+  page_delay_seconds_max: 25
+  page_load_timeout_seconds: 60
+  manual_wait_minutes: 15
+  max_pages_per_search: 20
+
+details:
+  enabled: true
+  minimum_score: 3
+  max_per_cycle: 6
+  page_delay_seconds_min: 30
+  page_delay_seconds_max: 45
+  max_photos: 3
+  download_photos: true
+
+notifications:
+  enabled: true
+  env_file: .env
+  minimum_score: 3
+  max_per_cycle: 1000
+  send_delay_seconds: 3.2
+  request_timeout_seconds: 30
+
+storage:
+  database: output/essentuki_rentals.sqlite3
+  csv: output/essentuki_rentals.csv
+  candidates_csv: output/essentuki_candidates.csv
+  photos_dir: output/photos
