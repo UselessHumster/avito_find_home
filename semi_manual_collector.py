@@ -22,7 +22,7 @@ import subprocess
 import sys
 import time
 from contextlib import closing
-from datetime import datetime
+from datetime import datetime, timedelta
 from pathlib import Path
 from typing import Any, Callable
 from urllib.parse import parse_qsl, urlencode, urlsplit, urlunsplit
@@ -855,6 +855,13 @@ def create_listing_notifiers(config: dict[str, Any]) -> dict[str, TelegramNotifi
     return {"main": main, "priority": priority, "trash": trash}
 
 
+def create_technical_notifier(config: dict[str, Any]) -> TelegramNotifier | None:
+    return (
+        create_telegram_notifier(config, "TELEGRAM_TECH_CHAT_ID")
+        or create_telegram_notifier(config, "TELEGRAM_CHAT_ID")
+    )
+
+
 def notifier_for_score(
     notifiers: dict[str, TelegramNotifier | None], score: int
 ) -> TelegramNotifier | None:
@@ -882,7 +889,7 @@ def send_operational_alert(
     last_sent = float(state.get(event_key, 0) or 0)
     if now - last_sent < cooldown_seconds:
         return False
-    notifier = create_telegram_notifier(config)
+    notifier = create_technical_notifier(config)
     if notifier is None:
         return False
     try:
@@ -1084,9 +1091,12 @@ def send_enrichment_notifications(config: dict[str, Any]) -> int:
     return updated
 
 
-def run_cycle(driver: webdriver.Chrome, config: dict[str, Any]) -> None:
+def run_cycle(driver: webdriver.Chrome, config: dict[str, Any]) -> dict[str, int]:
     storage = config["storage"]
     database_path = Path(storage["database"])
+    with closing(sqlite3.connect(database_path)) as connection:
+        known_ids = {row[0] for row in connection.execute("SELECT id FROM listings")}
+    seen_ids: set[str] = set()
     total_seen = 0
     for search in config["searches"]:
         category = search["name"]
@@ -1113,6 +1123,7 @@ def run_cycle(driver: webdriver.Chrome, config: dict[str, Any]) -> None:
             config["ranking"],
         )
         total_seen += len(listings)
+        seen_ids.update(listing.id for listing in listings)
         logger.info(
             f"💾 {search['name']}: сохранено {len(listings)}; "
             f"полный проход={'да' if completed else 'нет'}"
@@ -1126,6 +1137,39 @@ def run_cycle(driver: webdriver.Chrome, config: dict[str, Any]) -> None:
         f"прошли первичные фильтры {filtered_count}, карточек обогащено {enriched}, "
         f"уведомлений отправлено {notifications_sent}, дополнено {notifications_enriched}"
     )
+    return {
+        "added": len(seen_ids - known_ids),
+        "updated": len(seen_ids & known_ids),
+        "seen": len(seen_ids),
+        "enriched": enriched,
+    }
+
+
+def send_cycle_report(
+    config: dict[str, Any],
+    stats: dict[str, int],
+    next_run: datetime | None,
+) -> None:
+    notifier = create_technical_notifier(config)
+    if notifier is None:
+        return
+    next_text = (
+        next_run.strftime("%d.%m.%Y в %H:%M")
+        if next_run is not None
+        else "не запланирован (--once)"
+    )
+    message = (
+        "✅ <b>Прогон завершён</b>\n\n"
+        f"🆕 Добавлено: <b>{stats['added']}</b>\n"
+        f"🔄 Обновлено: <b>{stats['updated']}</b>\n"
+        f"👀 Найдено в выдаче: <b>{stats['seen']}</b>\n"
+        f"🏠 Карточек дополнено: <b>{stats['enriched']}</b>\n"
+        f"⏰ Следующий прогон: <b>{next_text}</b>"
+    )
+    try:
+        notifier.send_listing(message, [])
+    except TelegramAPIError as exc:
+        logger.error(f"Telegram: отчёт о прогоне не отправлен: {exc}")
 
 
 def parse_args() -> argparse.Namespace:
@@ -1209,13 +1253,16 @@ def main() -> int:
             )
             return 0
         while True:
-            run_cycle(driver, config)
+            stats = run_cycle(driver, config)
             if args.once:
+                send_cycle_report(config, stats, None)
                 break
             interval_min = int(config["collection"].get("interval_minutes_min", 30))
             interval_max = int(config["collection"].get("interval_minutes_max", 60))
             delay_minutes = random.randint(interval_min, interval_max)
+            next_run = datetime.now().astimezone() + timedelta(minutes=delay_minutes)
             logger.info(f"⏳ Следующий цикл через {delay_minutes} минут")
+            send_cycle_report(config, stats, next_run)
             time.sleep(delay_minutes * 60)
     except KeyboardInterrupt:
         storage = config["storage"]
