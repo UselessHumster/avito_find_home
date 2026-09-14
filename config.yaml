@@ -76,8 +76,8 @@ browser:
   driver_path: null
 
 collection:
-  interval_minutes_min: 30
-  interval_minutes_max: 60
+  interval_minutes_min: 120
+  interval_minutes_max: 180
   page_delay_seconds_min: 12
   page_delay_seconds_max: 25
   page_load_timeout_seconds: 60
