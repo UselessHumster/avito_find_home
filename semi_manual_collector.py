@@ -213,8 +213,53 @@ def stop_page_load(driver: webdriver.Chrome) -> None:
         pass
 
 
+def dismiss_secret_homes_popup(driver: webdriver.Chrome) -> bool:
+    """Close Avito's promotional “secret homes” dialog, if it is visible."""
+    script = r"""
+const visible = el => {
+  const style = getComputedStyle(el);
+  const rect = el.getBoundingClientRect();
+  return style.display !== 'none' && style.visibility !== 'hidden'
+    && rect.width > 0 && rect.height > 0;
+};
+const containers = [...document.querySelectorAll(
+  '[role="dialog"], [data-marker*="modal"], [data-marker*="popup"], [class*="modal"], [class*="popup"]'
+)].filter(visible);
+for (const container of containers) {
+  const text = (container.innerText || '').toLocaleLowerCase('ru-RU');
+  const secret = text.includes('секретн');
+  const homes = ['квартир', 'дом', 'жиль', 'объявлен'].some(word => text.includes(word));
+  if (!secret || !homes) continue;
+  const controls = [...container.querySelectorAll('button, [role="button"]')].filter(visible);
+  const close = controls.find(control => {
+    const label = [
+      control.innerText,
+      control.getAttribute('aria-label'),
+      control.getAttribute('title'),
+      control.getAttribute('data-marker'),
+    ].filter(Boolean).join(' ').toLocaleLowerCase('ru-RU');
+    return ['закры', 'close', 'крест', 'не сейчас', 'понятно'].some(word => label.includes(word))
+      || ['×', '✕', '✖'].includes((control.innerText || '').trim());
+  });
+  if (close) {
+    close.click();
+    return true;
+  }
+}
+return false;
+"""
+    try:
+        dismissed = bool(driver.execute_script(script))
+    except WebDriverException:
+        return False
+    if dismissed:
+        logger.info("Закрыли рекламное окно Avito «секретные объявления»")
+    return dismissed
+
+
 def read_current_page(driver: webdriver.Chrome) -> tuple[str, str]:
     try:
+        dismiss_secret_homes_popup(driver)
         return driver.page_source, driver.current_url
     except WebDriverException as exc:
         logger.warning(f"Не удалось прочитать страницу: {exc}")
