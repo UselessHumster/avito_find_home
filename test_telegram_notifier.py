@@ -5,7 +5,12 @@ import tempfile
 import unittest
 from pathlib import Path
 
-from src.telegram_notifier import TelegramNotifier, build_listing_message, split_message
+from src.telegram_notifier import (
+    TelegramNotifier,
+    build_listing_message,
+    load_env_file,
+    split_message,
+)
 
 
 class FakeResponse:
@@ -32,6 +37,21 @@ class FakeSession:
 
 
 class TelegramNotifierTest(unittest.TestCase):
+    def test_loads_first_variable_from_utf8_bom_env(self):
+        with tempfile.TemporaryDirectory() as directory:
+            path = Path(directory) / ".env"
+            path.write_text("TELEGRAM_BOT_TOKEN=test-token\n", encoding="utf-8-sig")
+            import os
+
+            previous = os.environ.pop("TELEGRAM_BOT_TOKEN", None)
+            try:
+                load_env_file(path)
+                self.assertEqual(os.environ["TELEGRAM_BOT_TOKEN"], "test-token")
+            finally:
+                os.environ.pop("TELEGRAM_BOT_TOKEN", None)
+                if previous is not None:
+                    os.environ["TELEGRAM_BOT_TOKEN"] = previous
+
     def test_builds_safe_ranked_message(self):
         message = build_listing_message(
             {

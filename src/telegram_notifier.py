@@ -41,7 +41,10 @@ def load_env_file(path: Path) -> None:
     """Load simple KEY=VALUE entries without overwriting process variables."""
     if not path.exists():
         return
-    for raw_line in path.read_text(encoding="utf-8").splitlines():
+    # PowerShell 5 writes UTF-8 files with BOM by default. ``utf-8-sig``
+    # transparently accepts both forms, preventing the first variable name
+    # (usually TELEGRAM_BOT_TOKEN) from becoming invisible to the parser.
+    for raw_line in path.read_text(encoding="utf-8-sig").splitlines():
         line = raw_line.strip()
         if not line or line.startswith("#") or "=" not in line:
             continue
